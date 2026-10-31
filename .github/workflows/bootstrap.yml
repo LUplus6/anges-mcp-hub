@@ -10,21 +10,47 @@ permissions:
 jobs:
   bootstrap:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
       - name: Extract starter files
+        shell: bash
         run: |
-          test -f dsha-agent-starter.zip
+          set -euo pipefail
+
+          if [ ! -f dsha-agent-starter.zip ]; then
+            echo "::error::找不到仓库根目录下的 dsha-agent-starter.zip"
+            echo "请确认 ZIP 已上传到仓库根目录。"
+            exit 1
+          fi
+
+          mkdir -p /tmp/dsha-agent-starter
           unzip -o dsha-agent-starter.zip -d /tmp/dsha-agent-starter
+
           cp -a /tmp/dsha-agent-starter/. .
+
+          # 避免自动提交新工作流文件触发额外的 workflows 权限限制
+          rm -f .github/workflows/test.yml
           rm -f dsha-agent-starter.zip
 
-      - name: Commit starter files
+      - name: Commit starter source files
+        shell: bash
         run: |
+          set -euo pipefail
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add -A
-          git commit -m "Bootstrap DSHA Agent MCP Hub"
-          git push
+
+          if git diff --cached --quiet; then
+            echo "没有需要提交的变更。"
+            exit 0
+          fi
+
+          git commit -m "Bootstrap DSHA Agent source files"
+          git push origin HEAD:main
